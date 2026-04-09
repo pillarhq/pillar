@@ -8,7 +8,7 @@ steps:
       - 'gcr.io/brendi-app/pillar-api:${_ENVIRONMENT}'
       - '-f'
       - 'backend/Dockerfile'
-      - '.'
+      - 'backend'
 
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/brendi-app/pillar-api:${_ENVIRONMENT}']
@@ -26,6 +26,8 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
+      - '--port'
+      - '8000'
       - '--memory'
       - '${_MEMORY}'
       - '--cpu'
@@ -45,7 +47,7 @@ steps:
       - '--set-secrets'
       - 'DJANGO_SECRET_KEY=pillar-django-secret-key:latest,HC_POSTGRES_PASSWORD=pillar-db-password:latest,HATCHET_CLIENT_TOKEN=pillar-hatchet-token:latest,FIELD_ENCRYPTION_KEY=pillar-field-encryption-key:latest,OPENROUTER_API_KEY=pillar-openrouter-api-key:latest,OPENAI_API_KEY=pillar-openai-api-key:latest,COHERE_API_KEY=pillar-cohere-api-key:latest,REDIS_URL=pillar-redis-url:latest'
       - '--set-env-vars'
-      - 'DJANGO_SETTINGS_MODULE=config.settings.production,HC_POSTGRES_HOST=${_DB_HOST},HC_POSTGRES_PORT=${_DB_PORT},HC_POSTGRES_DB=postgres,HC_POSTGRES_USER=${_DB_USER},HC_POSTGRES_OPTIONS=-c search_path=pillar%2Cpublic,GCP_PROJECT_ID=brendi-app,STORAGE_BACKEND=gcs,GS_BUCKET_NAME=pillar-storage,GCS_BUCKET_PUBLIC=pillar-public,ALLOWED_HOSTS=${_ALLOWED_HOSTS},CORS_ALLOWED_ORIGINS=${_CORS_ORIGINS},API_BASE_URL=${_API_BASE_URL},FRONTEND_URL=${_FRONTEND_URL},USE_JSON_LOGGING=true,HATCHET_NAMESPACE=pillar'
+      - 'DJANGO_SETTINGS_MODULE=config.settings.production,HC_POSTGRES_HOST=${_DB_HOST},HC_POSTGRES_PORT=${_DB_PORT},HC_POSTGRES_DB=postgres,HC_POSTGRES_USER=${_DB_USER},GCP_PROJECT_ID=brendi-app,STORAGE_BACKEND=gcs,GS_BUCKET_NAME=pillar-storage,GCS_BUCKET_PUBLIC=pillar-public,ALLOWED_HOSTS=${_ALLOWED_HOSTS},CORS_ALLOWED_ORIGINS=${_CORS_ORIGINS},API_BASE_URL=${_API_BASE_URL},FRONTEND_URL=${_FRONTEND_URL},USE_JSON_LOGGING=true,HATCHET_NAMESPACE=pillar'
 
 options:
   logging: CLOUD_LOGGING_ONLY

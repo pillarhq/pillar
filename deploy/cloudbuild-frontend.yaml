@@ -1,5 +1,7 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'DOCKER_BUILDKIT=1'
     args:
       - 'build'
       - '--build-arg'
@@ -10,7 +12,7 @@ steps:
       - 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}'
       - '-f'
       - 'frontend/Dockerfile'
-      - '.'
+      - 'frontend'
 
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}']

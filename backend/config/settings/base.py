@@ -162,6 +162,7 @@ DATABASES = {
             'keepalives_idle': 30,
             'keepalives_interval': 10,
             'keepalives_count': 5,
+            **({'options': os.environ['HC_POSTGRES_OPTIONS']} if os.environ.get('HC_POSTGRES_OPTIONS') else {}),
         },
     }
 }
