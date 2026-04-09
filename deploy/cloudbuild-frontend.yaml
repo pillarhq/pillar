@@ -1,0 +1,59 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_PILLAR_API_URL=${_API_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_ENV=${_ENVIRONMENT}'
+      - '-t'
+      - 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pillar-frontend${_ENVIRONMENT_SUFFIX}'
+      - '--image'
+      - 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '${_MEMORY}'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '${_MIN_INSTANCES}'
+      - '--max-instances'
+      - '5'
+      - '--concurrency'
+      - '200'
+      - '--timeout'
+      - '60'
+      - '--vpc-connector'
+      - 'vpc-connector-front'
+      - '--vpc-egress'
+      - 'private-ranges-only'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - 'gcr.io/brendi-app/pillar-frontend:${_ENVIRONMENT}'
+
+substitutions:
+  _ENVIRONMENT: 'production'
+  _ENVIRONMENT_SUFFIX: ''
+  _MEMORY: '512Mi'
+  _MIN_INSTANCES: '0'
+  _API_URL: 'https://pillar-api.brendi.com.br'

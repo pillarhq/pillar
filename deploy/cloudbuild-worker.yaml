@@ -1,0 +1,64 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'BASE_REGISTRY=gcr.io/brendi-app'
+      - '-t'
+      - 'gcr.io/brendi-app/pillar-worker:${_ENVIRONMENT}'
+      - '-f'
+      - 'backend/Dockerfile.worker'
+      - '.'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/brendi-app/pillar-worker:${_ENVIRONMENT}']
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'pillar-worker${_ENVIRONMENT_SUFFIX}'
+      - '--image'
+      - 'gcr.io/brendi-app/pillar-worker:${_ENVIRONMENT}'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--no-allow-unauthenticated'
+      - '--memory'
+      - '${_MEMORY}'
+      - '--cpu'
+      - '${_CPU}'
+      - '--min-instances'
+      - '${_MIN_INSTANCES}'
+      - '--max-instances'
+      - '3'
+      - '--concurrency'
+      - '1'
+      - '--timeout'
+      - '900'
+      - '--vpc-connector'
+      - 'vpc-connector-front'
+      - '--vpc-egress'
+      - 'private-ranges-only'
+      - '--set-secrets'
+      - 'DJANGO_SECRET_KEY=pillar-django-secret-key:latest,HC_POSTGRES_PASSWORD=pillar-db-password:latest,HATCHET_CLIENT_TOKEN=pillar-hatchet-token:latest,FIELD_ENCRYPTION_KEY=pillar-field-encryption-key:latest,OPENROUTER_API_KEY=pillar-openrouter-api-key:latest,OPENAI_API_KEY=pillar-openai-api-key:latest,COHERE_API_KEY=pillar-cohere-api-key:latest,REDIS_URL=pillar-redis-url:latest'
+      - '--set-env-vars'
+      - 'DJANGO_SETTINGS_MODULE=config.settings.production,HC_POSTGRES_HOST=${_DB_HOST},HC_POSTGRES_PORT=${_DB_PORT},HC_POSTGRES_DB=postgres,HC_POSTGRES_USER=${_DB_USER},HC_POSTGRES_OPTIONS=-c search_path=pillar%2Cpublic,GCP_PROJECT_ID=brendi-app,STORAGE_BACKEND=gcs,GS_BUCKET_NAME=pillar-storage,USE_JSON_LOGGING=true,SERVICE_TYPE=hatchet-worker,HATCHET_NAMESPACE=pillar'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+images:
+  - 'gcr.io/brendi-app/pillar-worker:${_ENVIRONMENT}'
+
+substitutions:
+  _ENVIRONMENT: 'production'
+  _ENVIRONMENT_SUFFIX: ''
+  _MEMORY: '2Gi'
+  _CPU: '2'
+  _MIN_INSTANCES: '1'
+  _DB_HOST: ''
+  _DB_PORT: '6543'
+  _DB_USER: ''
