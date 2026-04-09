@@ -1,4 +1,4 @@
-name: Deploy to VM
+name: 'deploy'
 
 on:
   push:
@@ -6,28 +6,92 @@ on:
     paths:
       - 'backend/**'
       - 'frontend/**'
-      - 'docker-compose.yml'
+      - 'deploy/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to deploy (api, worker, frontend, all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - api
+          - worker
+          - frontend
+          - all
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy--api:
+    if: >
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'api' || github.event.inputs.service == 'all') ||
+      github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: root
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            cd /opt/pillar
-            git pull origin main
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-            # Rebuild API
-            cd backend
-            docker build --build-arg BASE_REGISTRY=docker.io/library -f Dockerfile -t pillar-api:latest .
-            docker build --build-arg BASE_REGISTRY=docker.io/library -f Dockerfile.worker -t pillar-worker:latest .
+      - uses: google-github-actions/setup-gcloud@v2
 
-            # Restart
-            cd /opt/pillar
-            PG_PASS=$(grep HC_POSTGRES_PASSWORD backend/.env | cut -d= -f2)
-            HC_POSTGRES_PASSWORD=$PG_PASS docker compose up -d api worker --force-recreate
+      - name: Deploy API
+        run: |
+          gcloud builds submit \
+            --config=deploy/cloudbuild-api.yaml \
+            --substitutions="_ENVIRONMENT=production,_MIN_INSTANCES=1,_MEMORY=1Gi,_CPU=1,_DB_HOST=${{ secrets.PILLAR_DB_HOST }},_DB_PORT=6543,_DB_USER=${{ secrets.PILLAR_DB_USER }},_ALLOWED_HOSTS=.run.app%2Cpillar-api.brendi.com.br,_CORS_ORIGINS=${{ secrets.PILLAR_CORS_ORIGINS }},_API_BASE_URL=https://pillar-api.brendi.com.br,_FRONTEND_URL=${{ secrets.PILLAR_FRONTEND_URL }}" \
+            --project=brendi-app
+
+      - name: Verify health
+        run: |
+          sleep 30
+          curl -sf "https://pillar-api.brendi.com.br/health/ready/" || echo "Health check failed - DNS may not be migrated yet"
+
+  deploy--worker:
+    if: >
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'worker' || github.event.inputs.service == 'all') ||
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Worker
+        run: |
+          gcloud builds submit \
+            --config=deploy/cloudbuild-worker.yaml \
+            --substitutions="_ENVIRONMENT=production,_MIN_INSTANCES=1,_MEMORY=2Gi,_CPU=2,_DB_HOST=${{ secrets.PILLAR_DB_HOST }},_DB_PORT=6543,_DB_USER=${{ secrets.PILLAR_DB_USER }}" \
+            --project=brendi-app
+
+  deploy--frontend:
+    if: >
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'frontend' || github.event.inputs.service == 'all') ||
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Frontend
+        run: |
+          gcloud builds submit \
+            --config=deploy/cloudbuild-frontend.yaml \
+            --substitutions="_ENVIRONMENT=production,_MIN_INSTANCES=0,_MEMORY=512Mi,_API_URL=https://pillar-api.brendi.com.br" \
+            --project=brendi-app
